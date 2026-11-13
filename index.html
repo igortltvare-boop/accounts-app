@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f0f1a">
+<title>Счета — учёт</title>
+<style>
+:root{
+  --bg:#0f0f1a; --card:#1a1a2e; --card2:#22223a;
+  --accent:#4cc9f0; --accent2:#7209b7;
+  --text:#e8e8e8; --muted:#a0a0b0;
+  --green:#2ecc71; --red:#e74c3c; --yellow:#f1c40f;
+  --border:#2a2a40;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;
+  padding:12px 12px 90px;line-height:1.4;font-size:15px;
+}
+h1{font-size:1.15rem;color:var(--accent);text-align:center;margin:6px 0 12px}
+h2{font-size:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 3px 14px rgba(0,0,0,.3)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.row .label{color:var(--muted);font-size:.9rem}
+.row .value{font-weight:600}
+.row.total{border-top:2px solid var(--accent);margin-top:6px;padding-top:10px;border-bottom:none}
+.row.total .label,.row.total .value{font-size:1.05rem;color:var(--green)}
+.row.warn .value{color:var(--red)}
+input,select,button,textarea{font-family:inherit;font-size:1rem}
+input,select,textarea{
+  width:100%;padding:11px 12px;border:2px solid var(--border);
+  border-radius:10px;background:#12121f;color:var(--text);outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+button{
+  border:none;border-radius:10px;padding:12px;font-weight:600;
+  background:var(--card2);color:var(--text);cursor:pointer;
+  transition:transform .1s,opacity .1s;
+}
+button:active{transform:scale(.98);opacity:.9}
+.btn-main{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;width:100%;margin-top:10px}
+.btn-danger{background:#5a1f1f;color:#ffb3b3;width:100%;margin-top:10px}
+.btn-small{padding:7px 10px;font-size:.85rem}
+.tabs{
+  position:fixed;bottom:0;left:0;right:0;display:flex;
+  background:var(--card);border-top:1px solid var(--border);z-index:1000;
+}
+.tabs button{
+  flex:1;border-radius:0;background:transparent;color:var(--muted);
+  padding:12px 4px;font-size:.78rem;font-weight:600;
+}
+.tabs button.active{color:var(--accent);border-top:3px solid var(--accent)}
+.tab-page{display:none}
+.tab-page.active{display:block}
+.month-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.month-nav button{width:46px;padding:10px 0;font-size:1.2rem}
+.month-title{font-size:1.05rem;font-weight:700;text-align:center;flex:1}
+.item{background:var(--card2);border-radius:10px;padding:10px;margin-bottom:8px}
+.item-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.item-name{font-weight:600}
+.item-sum{font-weight:700;color:var(--accent);white-space:nowrap}
+.item-meta{font-size:.8rem;color:var(--muted);margin-top:3px}
+.item-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.check-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.check-row input[type=checkbox]{width:22px;height:22px;accent-color:var(--green)}
+.check-row input[type=date]{width:auto;flex:1;min-width:130px;padding:6px 8px;font-size:.85rem}
+.empty{color:var(--muted);text-align:center;padding:16px 0;font-size:.9rem}
+.hint{font-size:.78rem;color:var(--muted);margin-top:6px}
+.hidden{display:none}
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;
+  display:none;align-items:center;justify-content:center;padding:16px;
+}
+.modal-bg.show{display:flex}
+.modal{background:var(--card);border-radius:14px;padding:16px;max-width:500px;width:100%;max-height:90vh;overflow:auto}
+.modal h3{font-size:1rem;margin-bottom:10px;color:var(--accent)}
+.inline-2{display:flex;gap:8px}
+.inline-2 > *{flex:1}
+.badge{display:inline-block;font-size:.72rem;padding:2px 7px;border-radius:6px;background:var(--border);color:var(--muted);margin-left:6px}
+.badge.paid{background:#1e4d32;color:#8ff0b5}
+.badge.due{background:#5a4a1f;color:#ffe08a}
+</style>
+</head>
+<body>
+
+<h1>💰 Учёт счетов</h1>
+
+<!-- ================= МЕСЯЦ ================= -->
+<div class="tab-page active" id="page-month">
+  <div class="card">
+    <div class="month-nav">
+      <button onclick="shiftMonth(-1)">←</button>
+      <div class="month-title" id="monthTitle">—</div>
+      <button onclick="shiftMonth(1)">→</button>
+    </div>
+    <button class="btn-small" style="width:100%" onclick="goCurrentMonth()">Текущий месяц</button>
+  </div>
+
+  <div class="card">
+    <h2>Доход</h2>
+    <div id="incomeList"></div>
+    <div class="inline-2" style="margin-top:8px">
+      <input id="incomeSum" type="number" step="0.01" min="0" placeholder="Сумма €" inputmode="decimal">
+      <input id="incomeDesc" placeholder="Описание (зарплата)">
+    </div>
+    <button class="btn-main" onclick="addIncome()">Добавить доход</button>
+  </div>
+
+  <div class="card">
+    <h2>Счета к оплате</h2>
+    <div id="billsList"></div>
+    <div class="hint">Галочка = оплачено. Дата ставится автоматически, можно изменить.</div>
+  </div>
+
+  <div class="card">
+    <h2>Разовые траты в этом месяце</h2>
+    <div id="oneoffList"></div>
+    <div class="inline-2" style="margin-top:8px">
+      <input id="oneoffSum" type="number" step="0.01" min="0" placeholder="Сумма €" inputmode="decimal">
+      <input id="oneoffDesc" placeholder="Описание">
+    </div>
+    <button class="btn-main" onclick="addOneOff()">Добавить разовую трату</button>
+  </div>
+
+  <div class="card">
+    <h2>Итоги месяца</h2>
+    <div class="row"><span class="label">Доход</span><span class="value" id="sumIncome">0 €</span></div>
+    <div class="row"><span class="label">Счета к оплате</span><span class="value" id="sumBills">0 €</span></div>
+    <div class="row"><span class="label">Разовые траты</span><span class="value" id="sumOneoff">0 €</span></div>
+    <div class="row"><span class="label">Всего к оплате</span><span class="value" id="sumTotal">0 €</span></div>
+    <div class="row"><span class="label">Оплачено</span><span class="value" id="sumPaid">0 €</span></div>
+    <div class="row warn"><span class="label">Осталось оплатить</span><span class="value" id="sumLeft">0 €</span></div>
+    <div class="row total"><span class="label">Остаток от дохода</span><span class="value" id="sumRest">0 €</span></div>
+  </div>
+</div>
+
+<!-- ================= СЧЕТА ================= -->
+<div class="tab-page" id="page-bills">
+  <div class="card">
+    <h2>Добавить счёт</h2>
+    <label>Название</label>
+    <input id="bName" placeholder="Электричество">
+    <label>Сумма, €</label>
+    <input id="bSum" type="number" step="0.01" min="0" placeholder="12.84" inputmode="decimal">
+    <label>Периодичность</label>
+    <select id="bPeriod">
+      <option value="1">Каждый месяц</option>
+      <option value="2">Раз в 2 месяца</option>
+      <option value="3">Раз в 3 месяца</option>
+      <option value="6">Раз в 6 месяцев</option>
+      <option value="12">Раз в год</option>
+    </select>
+    <label>Месяц первого платежа (для редких)</label>
+    <select id="bFirstMonth">
+      <option value="1">Январь</option><option value="2">Февраль</option>
+      <option value="3">Март</option><option value="4">Апрель</option>
+      <option value="5">Май</option><option value="6">Июнь</option>
+      <option value="7">Июль</option><option value="8">Август</option>
+      <option value="9">Сентябрь</option><option value="10">Октябрь</option>
+      <option value="11">Ноябрь</option><option value="12">Декабрь</option>
+    </select>
+    <label>Примечание (необязательно)</label>
+    <input id="bNote" placeholder="">
+    <button class="btn-main" onclick="addBill()">Сохранить счёт</button>
+    <div class="hint">Для «каждый месяц» месяц первого платежа не важен.</div>
+  </div>
+
+  <div class="card">
+    <h2>Мои счета</h2>
+    <div id="billsTemplates"></div>
+  </div>
+</div>
+
+<!-- ================= ИСТОРИЯ ================= -->
+<div class="tab-page" id="page-history">
+  <div class="card">
+    <h2>История по месяцам</h2>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<!-- ================= ДАННЫЕ ================= -->
+<div class="tab-page" id="page-data">
+  <div class="card">
+    <h2>Экспорт и импорт</h2>
+    <p class="hint">Данные хранятся в браузере этого устройства. Чтобы перенести на телефон или планшет — экспортируйте файл и импортируйте на другом устройстве.</p>
+    <button class="btn-main" onclick="exportData()">📥 Экспорт в файл</button>
+    <label style="margin-top:14px">Импорт из файла</label>
+    <input type="file" id="importFile" accept="application/json">
+    <button class="btn-main" onclick="importData()">📤 Импортировать</button>
+    <div class="hint">Импорт заменит все текущие данные. Перед импортом сделайте экспорт текущих.</div>
+  </div>
+
+  <div class="card">
+    <h2>Опасная зона</h2>
+    <button class="btn-danger" onclick="clearAll()">🗑 Очистить все данные</button>
+  </div>
+</div>
+
+<!-- ================= МОДАЛКА РЕДАКТИРОВАНИЯ ================= -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Редактирование</h3>
+    <div id="modalBody"></div>
+    <button class="btn-main" onclick="closeModal()">Закрыть</button>
+  </div>
+</div>
+
+<!-- ================= НИЖНИЕ ВКЛАДКИ ================= -->
+<div class="tabs">
+  <button class="active" data-tab="month" onclick="switchTab('month')">Месяц</button>
+  <button data-tab="bills" onclick="switchTab('bills')">Счета</button>
+  <button data-tab="history" onclick="switchTab('history')">История</button>
+  <button data-tab="data" onclick="switchTab('data')">Данные</button>
+</div>
+
+<script>
+/* ============================================================
+   ХРАНИЛИЩЕ
+   ============================================================ */
+const STORAGE_KEY = 'accounts_app_v1';
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+// state = {
+//   bills: [ {id, name, sum, period, firstMonth, note} ],
+//   months: { "2026-11": {
+//       incomes: [ {id, sum, desc} ],
+//       payments: { billId: {paid:true, date:"2026-11-05"} },
+//       oneoffs: [ {id, sum, desc, date} ]
+//   }}
+// }
+let state = { bills: [], months: {} };
+let currentMonth = null; // "YYYY-MM"
+let editingBillId = null;
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state.bills = Array.isArray(parsed.bills) ? parsed.bills : [];
+      state.months = parsed.months && typeof parsed.months === 'object' ? parsed.months : {};
+    }
+  }catch(e){
+    console.error('Ошибка загрузки', e);
+  }
+}
+
+/* ============================================================
+   УТИЛИТЫ
+   ============================================================ */
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+function fmt(num){
+  const n = Number(num) || 0;
+  return n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €';
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function monthKey(year, month1to12){ return year + '-' + pad(month1to12); }
+function parseMonthKey(key){
+  const [y,m] = key.split('-').map(Number);
+  return {year:y, month:m};
+}
+function currentMonthKey(){
+  const d = new Date();
+  return monthKey(d.getFullYear(), d.getMonth()+1);
+}
+function monthTitle(key){
+  const {year,month} = parseMonthKey(key);
+  return MONTH_NAMES[month-1] + ' ' + year;
+}
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
+function getMonthData(key){
+  if(!state.months[key]){
+    state.months[key] = { incomes:[], payments:{}, oneoffs:[] };
+  }
+  return state.months[key];
+}
+function isEmptyMonth(data){
+  if(!data) return true;
+  return (data.incomes||[]).length === 0 &&
+         (data.oneoffs||[]).length === 0 &&
+         Object.keys(data.payments||{}).length === 0;
+}
+
+/* ============================================================
+   ЛОГИКА ПЕРИОДИЧНОСТИ
+   ============================================================ */
+// Счёт попадает в месяц (year, month1to12)?
+function billDueInMonth(bill, year, month1to12){
+  const period = Number(bill.period) || 1;
+  if(period === 1) return true; // каждый месяц
+  const first = Number(bill.firstMonth) || 1;
+  // разница в месяцах от первого платежа
+  let diff = (year * 12 + month1to12) - (2000 * 12 + first);
+  // используем опорный год 2000 просто чтобы получить смещение
+  if(diff < 0){
+    // корректно приводим по модулю
+    const m = ((month1to12 - first) % period + period) % period;
+    return m === 0;
+  }
+  return diff % period === 0;
+}
+
+// Сумма всех счетов, которые к оплате в данном месяце
+function billsDueForMonth(key){
+  const {year,month} = parseMonthKey(key);
+  return state.bills.filter(b => billDueInMonth(b, year, month));
+}
+
+/* ============================================================
+   ОТРИСОВКА: МЕСЯЦ
+   ============================================================ */
+function renderMonth(){
+  document.getElementById('monthTitle').textContent = monthTitle(currentMonth);
+  const md = getMonthData(currentMonth);
+
+  // Доход
+  const incBox = document.getElementById('incomeList');
+  incBox.innerHTML = '';
+  if(!md.incomes.length){
+    incBox.innerHTML = '<div class="empty">Доход не введён</div>';
+  }else{
+    md.incomes.forEach(inc => {
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = '<div class="item-head">' +
+        '<div><div class="item-name">' + escapeHtml(inc.desc || 'Доход') + '</div></div>' +
+        '<div class="item-sum">' + fmt(inc.sum) + '</div></div>' +
+        '<div class="item-actions">' +
+        '<button class="btn-small" onclick="deleteIncome(\'' + inc.id + '\')">Удалить</button>' +
+        '</div>';
+      incBox.appendChild(el);
+    });
+  }
+
+  // Счета к оплате
+  const billsBox = document.getElementById('billsList');
+  billsBox.innerHTML = '';
+  const due = billsDueForMonth(currentMonth);
+  if(!due.length){
+    billsBox.innerHTML = '<div class="empty">В этом месяце счетов нет</div>';
+  }else{
+    due.forEach(bill => {
+      const pay = md.payments[bill.id] || {};
+      const paid = !!pay.paid;
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML =
+        '<div class="item-head">' +
+          '<div>' +
+            '<div class="item-name">' + escapeHtml(bill.name) +
+              '<span class="badge ' + (paid?'paid':'due') + '">' +
+              (paid?'оплачено':'к оплате') + '</span>' +
+            '</div>' +
+            (bill.note ? '<div class="item-meta">' + escapeHtml(bill.note) + '</div>' : '') +
+          '</div>' +
+          '<div class="item-sum">' + fmt(bill.sum) + '</div>' +
+        '</div>' +
+        '<div class="check-row">' +
+          '<input type="checkbox" ' + (paid?'checked':'') +
+            ' onchange="togglePaid(\'' + bill.id + '\', this.checked)">' +
+          '<span style="font-size:.85rem;color:var(--muted)">Оплачено</span>' +
+          '<input type="date" value="' + (pay.date || '') + '"' +
+            ' onchange="setPayDate(\'' + bill.id + '\', this.value)">' +
+        '</div>';
+      billsBox.appendChild(el);
+    });
+  }
+
+  // Разовые
+  const ooBox = document.getElementById('oneoffList');
+  ooBox.innerHTML = '';
+  if(!md.oneoffs.length){
+    ooBox.innerHTML = '<div class="empty">Разовых трат нет</div>';
+  }else{
+    md.oneoffs.forEach(o => {
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = '<div class="item-head">' +
+        '<div><div class="item-name">' + escapeHtml(o.desc || 'Трата') + '</div>' +
+        '<div class="item-meta">' + escapeHtml(o.date || '') + '</div></div>' +
+        '<div class="item-sum">' + fmt(o.sum) + '</div></div>' +
+        '<div class="item-actions">' +
+        '<button class="btn-small" onclick="deleteOneOff(\'' + o.id + '\')">Удалить</button>' +
+        '</div>';
+      ooBox.appendChild(el);
+    });
+  }
+
+  renderMonthTotals();
+}
+
+function renderMonthTotals(){
+  const md = getMonthData(currentMonth);
+  const due = billsDueForMonth(currentMonth);
+
+  const income = md.incomes.reduce((s,i)=>s + (Number(i.sum)||0), 0);
+  const billsSum = due.reduce((s,b)=>s + (Number(b.sum)||0), 0);
+  const oneoffSum = md.oneoffs.reduce((s,o)=>s + (Number(o.sum)||0), 0);
+  const total = billsSum + oneoffSum;
+
+  let paidSum = 0;
+  due.forEach(b=>{
+    if(md.payments[b.id] && md.payments[b.id].paid){
+      paidSum += Number(b.sum)||0;
+    }
+  });
+  md.oneoffs.forEach(o=>{
+    // разовые считаем оплаченными по факту добавления? нет — считаем отдельно как оплаченные, если есть дата
+    // Для простоты: разовые попадают в "к оплате" и "оплачено" одновременно, если у них есть дата.
+    // Но раз мы их добавляем как уже совершённые — считаем оплаченными.
+    paidSum += Number(o.sum)||0;
+  });
+
+  const left = total - paidSum;
+  const rest = income - total;
+
+  document.getElementById('sumIncome').textContent = fmt(income);
+  document.getElementById('sumBills').textContent = fmt(billsSum);
+  document.getElementById('sumOneoff').textContent = fmt(oneoffSum);
+  document.getElementById('sumTotal').textContent = fmt(total);
+  document.getElementById('sumPaid').textContent = fmt(paidSum);
+  document.getElementById('sumLeft').textContent = fmt(left);
+  document.getElementById('sumRest').textContent = fmt(rest);
+  document.getElementById('sumRest').parentElement.classList.toggle('warn', rest < 0);
+}
+
+/* ============================================================
+   ДОХОД
+   ============================================================ */
+function addIncome(){
+  const sumEl = document.getElementById('incomeSum');
+  const descEl = document.getElementById('incomeDesc');
+  const sum = parseFloat(sumEl.value);
+  if(!Number.isFinite(sum) || sum <= 0){
+    alert('Введите сумму больше 0'); return;
+  }
+  const md = getMonthData(currentMonth);
+  md.incomes.push({id:uid(), sum:sum, desc:descEl.value.trim() || 'Доход'});
+  sumEl.value = ''; descEl.value = '';
+  saveState(); renderMonth();
+}
+function deleteIncome(id){
+  const md = getMonthData(currentMonth);
+  md.incomes = md.incomes.filter(i=>i.id !== id);
+  saveState(); renderMonth();
+}
+
+/* ============================================================
+   ОПЛАТА СЧЕТОВ
+   ============================================================ */
+function togglePaid(billId, checked){
+  const md = getMonthData(currentMonth);
+  if(!md.payments[billId]) md.payments[billId] = {paid:false, date:''};
+  md.payments[billId].paid = checked;
+  if(checked && !md.payments[billId].date){
+    md.payments[billId].date = todayISO();
+  }
+  if(!checked){
+    md.payments[billId].date = '';
+  }
+  saveState(); renderMonth();
+}
+function setPayDate(billId, value){
+  const md = getMonthData(currentMonth);
+  if(!md.payments[billId]) md.payments[billId] = {paid:false, date:''};
+  md.payments[billId].date = value;
+  if(value) md.payments[billId].paid = true;
+  saveState(); renderMonth();
+}
+
+/* ============================================================
+   РАЗОВЫЕ
+   ============================================================ */
+function addOneOff(){
+  const sumEl = document.getElementById('oneoffSum');
+  const descEl = document.getElementById('oneoffDesc');
+  const sum = parseFloat(sumEl.value);
+  if(!Number.isFinite(sum) || sum <= 0){
+    alert('Введите сумму больше 0'); return;
+  }
+  const md = getMonthData(currentMonth);
+  md.oneoffs.push({id:uid(), sum:sum, desc:descEl.value.trim() || 'Трата', date:todayISO()});
+  sumEl.value = ''; descEl.value = '';
+  saveState(); renderMonth();
+}
+function deleteOneOff(id){
+  const md = getMonthData(currentMonth);
+  md.oneoffs = md.oneoffs.filter(o=>o.id !== id);
+  saveState(); renderMonth();
+}
+
+/* ============================================================
+   СЧЕТА-ШАБЛОНЫ
+   ============================================================ */
+function addBill(){
+  const name = document.getElementById('bName').value.trim();
+  const sum = parseFloat(document.getElementById('bSum').value);
+  const period = Number(document.getElementById('bPeriod').value);
+  const firstMonth = Number(document.getElementById('bFirstMonth').value);
+  const note = document.getElementById('bNote').value.trim();
+
+  if(!name){ alert('Введите название'); return; }
+  if(!Number.isFinite(sum) || sum <= 0){ alert('Введите сумму больше 0'); return; }
+
+  state.bills.push({
+    id: uid(), name:name, sum:sum, period:period,
+    firstMonth:firstMonth, note:note
+  });
+  saveState();
+
+  document.getElementById('bName').value = '';
+  document.getElementById('bSum').value = '';
+  document.getElementById('bNote').value = '';
+  renderBillsTemplates();
+  renderMonth();
+}
+
+function deleteBill(id){
+  if(!confirm('Удалить счёт? Оплаты по нему в истории останутся.')) return;
+  state.bills = state.bills.filter(b=>b.id !== id);
+  saveState();
+  renderBillsTemplates(); renderMonth();
+}
+
+function renderBillsTemplates(){
+  const box = document.getElementById('billsTemplates');
+  box.innerHTML = '';
+  if(!state.bills.length){
+    box.innerHTML = '<div class="empty">Счетов пока нет</div>';
+    return;
+  }
+  state.bills.forEach(b => {
+    const periodText = b.period === 1 ? 'каждый месяц'
+      : b.period === 2 ? 'раз в 2 мес.'
+      : b.period === 3 ? 'раз в 3 мес.'
+      : b.period === 6 ? 'раз в 6 мес.'
+      : 'раз в год';
+    const firstText = b.period === 1 ? '' : ' • первый: ' + MONTH_NAMES[(b.firstMonth||1)-1];
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML =
+      '<div class="item-head">' +
+        '<div><div class="item-name">' + escapeHtml(b.name) + '</div>' +
+        '<div class="item-meta">' + periodText + firstText +
+        (b.note ? ' • ' + escapeHtml(b.note) : '') + '</div></div>' +
+        '<div class="item-sum">' + fmt(b.sum) + '</div>' +
+      '</div>' +
+      '<div class="item-actions">' +
+        '<button class="btn-small" onclick="deleteBill(\'' + b.id + '\')">Удалить</button>' +
+      '</div>';
+    box.appendChild(el);
+  });
+}
+
+/* ============================================================
+   ИСТОРИЯ
+   ============================================================ */
+function renderHistory(){
+  const box = document.getElementById('historyList');
+  box.innerHTML = '';
+
+  // собираем все месяцы: из state.months + текущий + последние 12
+  const keys = new Set(Object.keys(state.months));
+  const now = new Date();
+  for(let i=0;i<12;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    keys.add(monthKey(d.getFullYear(), d.getMonth()+1));
+  }
+  const sorted = Array.from(keys).sort().reverse();
+
+  let shown = 0;
+  sorted.forEach(key=>{
+    const md = state.months[key];
+    if(isEmptyMonth(md) && key !== currentMonthKey()) return;
+    shown++;
+
+    const due = billsDueForMonth(key);
+    const billsSum = due.reduce((s,b)=>s + (Number(b.sum)||0), 0);
+    const oneoffSum = (md?.oneoffs||[]).reduce((s,o)=>s + (Number(o.sum)||0), 0);
+    const income = (md?.incomes||[]).reduce((s,i)=>s + (Number(i.sum)||0), 0);
+    const total = billsSum + oneoffSum;
+
+    let paid = 0;
+    due.forEach(b=>{
+      if(md?.payments?.[b.id]?.paid) paid += Number(b.sum)||0;
+    });
+    (md?.oneoffs||[]).forEach(o=>{ paid += Number(o.sum)||0; });
+
+    const rest = income - total;
+
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.style.cursor = 'pointer';
+    el.onclick = ()=>{ currentMonth = key; switchTab('month'); renderMonth(); };
+    el.innerHTML =
+      '<div class="item-head">' +
+        '<div><div class="item-name">' + monthTitle(key) + '</div>' +
+        '<div class="item-meta">доход ' + fmt(income) +
+        ' • к оплате ' + fmt(total) + '</div></div>' +
+        '<div class="item-sum" style="color:' + (rest<0?'var(--red)':'var(--green)') + '">' +
+        fmt(rest) + '</div>' +
+      '</div>';
+    box.appendChild(el);
+  });
+
+  if(!shown){
+    box.innerHTML = '<div class="empty">Данных пока нет</div>';
+  }
+}
+
+/* ============================================================
+   ЭКСПОРТ / ИМПОРТ / ОЧИСТКА
+   ============================================================ */
+function exportData(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  a.href = url;
+  a.download = 'accounts-' + d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + '.json';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importData(){
+  const fileInput = document.getElementById('importFile');
+  const file = fileInput.files[0];
+  if(!file){ alert('Выберите файл'); return; }
+  if(!confirm('Импорт заменит все текущие данные. Продолжить?')) return;
+
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed || typeof parsed !== 'object') throw new Error('Неверный формат');
+      state.bills = Array.isArray(parsed.bills) ? parsed.bills : [];
+      state.months = parsed.months && typeof parsed.months === 'object' ? parsed.months : {};
+      saveState();
+      renderAll();
+      alert('Импорт завершён. Счетов: ' + state.bills.length +
+        ', месяцев: ' + Object.keys(state.months).length);
+      fileInput.value = '';
+    }catch(err){
+      alert('Ошибка импорта: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function clearAll(){
+  if(!confirm('Удалить ВСЕ данные без возможности восстановления?')) return;
+  if(!confirm('Точно? Это необратимо. Рекомендуем сначала сделать экспорт.')) return;
+  state = {bills:[], months:{}};
+  saveState();
+  renderAll();
+}
+
+/* ============================================================
+   НАВИГАЦИЯ
+   ============================================================ */
+function switchTab(name){
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector('.tabs button[data-tab="' + name + '"]').classList.add('active');
+
+  if(name === 'month') renderMonth();
+  if(name === 'bills') renderBillsTemplates();
+  if(name === 'history') renderHistory();
+}
+
+function shiftMonth(delta){
+  const {year, month} = parseMonthKey(currentMonth);
+  const d = new Date(year, month - 1 + delta, 1);
+  currentMonth = monthKey(d.getFullYear(), d.getMonth()+1);
+  renderMonth();
+}
+function goCurrentMonth(){
+  currentMonth = currentMonthKey();
+  renderMonth();
+}
+
+/* ============================================================
+   МОДАЛКА (заготовка на будущее)
+   ============================================================ */
+function closeModal(){
+  document.getElementById('modalBg').classList.remove('show');
+}
+
+/* ============================================================
+   УТИЛИТЫ БЕЗОПАСНОСТИ
+   ============================================================ */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+/* ============================================================
+   СТАРТ
+   ============================================================ */
+function renderAll(){
+  renderMonth();
+  renderBillsTemplates();
+  renderHistory();
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadState();
+  currentMonth = currentMonthKey();
+  renderAll();
+  switchTab('month');
+});
+</script>
+</body>
+</html>
