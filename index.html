@@ -11,7 +11,7 @@
   --bg:#0f0f1a; --card:#1a1a2e; --card2:#22223a;
   --accent:#4cc9f0; --accent2:#7209b7;
   --text:#e8e8e8; --muted:#a0a0b0;
-  --green:#2ecc71; --red:#e74c3c; --yellow:#f1c40f;
+  --green:#2ecc71; --red:#e74c3c;
   --border:#2a2a40;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -71,14 +71,6 @@ button:active{transform:scale(.98);opacity:.9}
 .check-row input[type=date]{width:auto;flex:1;min-width:130px;padding:6px 8px;font-size:.85rem}
 .empty{color:var(--muted);text-align:center;padding:16px 0;font-size:.9rem}
 .hint{font-size:.78rem;color:var(--muted);margin-top:6px}
-.hidden{display:none}
-.modal-bg{
-  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;
-  display:none;align-items:center;justify-content:center;padding:16px;
-}
-.modal-bg.show{display:flex}
-.modal{background:var(--card);border-radius:14px;padding:16px;max-width:500px;width:100%;max-height:90vh;overflow:auto}
-.modal h3{font-size:1rem;margin-bottom:10px;color:var(--accent)}
 .inline-2{display:flex;gap:8px}
 .inline-2 > *{flex:1}
 .badge{display:inline-block;font-size:.72rem;padding:2px 7px;border-radius:6px;background:var(--border);color:var(--muted);margin-left:6px}
@@ -141,8 +133,8 @@ button:active{transform:scale(.98);opacity:.9}
 
 <!-- ================= СЧЕТА ================= -->
 <div class="tab-page" id="page-bills">
-  <div class="card">
-    <h2>Добавить счёт</h2>
+  <div class="card" id="billFormCard">
+    <h2 id="billFormTitle">Добавить счёт</h2>
     <label>Название</label>
     <input id="bName" placeholder="Электричество">
     <label>Сумма, €</label>
@@ -166,7 +158,8 @@ button:active{transform:scale(.98);opacity:.9}
     </select>
     <label>Примечание (необязательно)</label>
     <input id="bNote" placeholder="">
-    <button class="btn-main" onclick="addBill()">Сохранить счёт</button>
+    <button class="btn-main" id="saveBillBtn" onclick="addBill()">Сохранить счёт</button>
+    <button class="btn-small" id="cancelBillBtn" style="display:none;width:100%;margin-top:8px" onclick="cancelBillEdit()">Отмена</button>
     <div class="hint">Для «каждый месяц» месяц первого платежа не важен.</div>
   </div>
 
@@ -202,15 +195,6 @@ button:active{transform:scale(.98);opacity:.9}
   </div>
 </div>
 
-<!-- ================= МОДАЛКА РЕДАКТИРОВАНИЯ ================= -->
-<div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <h3 id="modalTitle">Редактирование</h3>
-    <div id="modalBody"></div>
-    <button class="btn-main" onclick="closeModal()">Закрыть</button>
-  </div>
-</div>
-
 <!-- ================= НИЖНИЕ ВКЛАДКИ ================= -->
 <div class="tabs">
   <button class="active" data-tab="month" onclick="switchTab('month')">Месяц</button>
@@ -227,16 +211,8 @@ const STORAGE_KEY = 'accounts_app_v1';
 const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь',
   'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
-// state = {
-//   bills: [ {id, name, sum, period, firstMonth, note} ],
-//   months: { "2026-11": {
-//       incomes: [ {id, sum, desc} ],
-//       payments: { billId: {paid:true, date:"2026-11-05"} },
-//       oneoffs: [ {id, sum, desc, date} ]
-//   }}
-// }
 let state = { bills: [], months: {} };
-let currentMonth = null; // "YYYY-MM"
+let currentMonth = null;
 let editingBillId = null;
 
 function saveState(){
@@ -299,23 +275,18 @@ function isEmptyMonth(data){
 /* ============================================================
    ЛОГИКА ПЕРИОДИЧНОСТИ
    ============================================================ */
-// Счёт попадает в месяц (year, month1to12)?
 function billDueInMonth(bill, year, month1to12){
   const period = Number(bill.period) || 1;
-  if(period === 1) return true; // каждый месяц
+  if(period === 1) return true;
   const first = Number(bill.firstMonth) || 1;
-  // разница в месяцах от первого платежа
   let diff = (year * 12 + month1to12) - (2000 * 12 + first);
-  // используем опорный год 2000 просто чтобы получить смещение
   if(diff < 0){
-    // корректно приводим по модулю
     const m = ((month1to12 - first) % period + period) % period;
     return m === 0;
   }
   return diff % period === 0;
 }
 
-// Сумма всех счетов, которые к оплате в данном месяце
 function billsDueForMonth(key){
   const {year,month} = parseMonthKey(key);
   return state.bills.filter(b => billDueInMonth(b, year, month));
@@ -420,9 +391,6 @@ function renderMonthTotals(){
     }
   });
   md.oneoffs.forEach(o=>{
-    // разовые считаем оплаченными по факту добавления? нет — считаем отдельно как оплаченные, если есть дата
-    // Для простоты: разовые попадают в "к оплате" и "оплачено" одновременно, если у них есть дата.
-    // Но раз мы их добавляем как уже совершённые — считаем оплаченными.
     paidSum += Number(o.sum)||0;
   });
 
@@ -505,7 +473,7 @@ function deleteOneOff(id){
 }
 
 /* ============================================================
-   СЧЕТА-ШАБЛОНЫ
+   СЧЕТА-ШАБЛОНЫ: добавление / редактирование
    ============================================================ */
 function addBill(){
   const name = document.getElementById('bName').value.trim();
@@ -516,6 +484,23 @@ function addBill(){
 
   if(!name){ alert('Введите название'); return; }
   if(!Number.isFinite(sum) || sum <= 0){ alert('Введите сумму больше 0'); return; }
+
+  if(editingBillId){
+    const b = state.bills.find(x => x.id === editingBillId);
+    if(b){
+      b.name = name;
+      b.sum = sum;
+      b.period = period;
+      b.firstMonth = firstMonth;
+      b.note = note;
+    }
+    editingBillId = null;
+    saveState();
+    cancelBillEdit();
+    renderBillsTemplates();
+    renderMonth();
+    return;
+  }
 
   state.bills.push({
     id: uid(), name:name, sum:sum, period:period,
@@ -530,9 +515,40 @@ function addBill(){
   renderMonth();
 }
 
+function editBill(id){
+  const b = state.bills.find(x => x.id === id);
+  if(!b) return;
+  editingBillId = id;
+
+  document.getElementById('bName').value = b.name || '';
+  document.getElementById('bSum').value = b.sum ?? '';
+  document.getElementById('bPeriod').value = String(b.period || 1);
+  document.getElementById('bFirstMonth').value = String(b.firstMonth || 1);
+  document.getElementById('bNote').value = b.note || '';
+
+  document.getElementById('billFormTitle').textContent = 'Редактирование счёта';
+  document.getElementById('saveBillBtn').textContent = 'Обновить счёт';
+  document.getElementById('cancelBillBtn').style.display = 'block';
+
+  document.getElementById('billFormCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function cancelBillEdit(){
+  editingBillId = null;
+  document.getElementById('bName').value = '';
+  document.getElementById('bSum').value = '';
+  document.getElementById('bPeriod').value = '1';
+  document.getElementById('bFirstMonth').value = '1';
+  document.getElementById('bNote').value = '';
+  document.getElementById('billFormTitle').textContent = 'Добавить счёт';
+  document.getElementById('saveBillBtn').textContent = 'Сохранить счёт';
+  document.getElementById('cancelBillBtn').style.display = 'none';
+}
+
 function deleteBill(id){
   if(!confirm('Удалить счёт? Оплаты по нему в истории останутся.')) return;
   state.bills = state.bills.filter(b=>b.id !== id);
+  if(editingBillId === id) cancelBillEdit();
   saveState();
   renderBillsTemplates(); renderMonth();
 }
@@ -561,6 +577,7 @@ function renderBillsTemplates(){
         '<div class="item-sum">' + fmt(b.sum) + '</div>' +
       '</div>' +
       '<div class="item-actions">' +
+        '<button class="btn-small" onclick="editBill(\'' + b.id + '\')">Редактировать</button>' +
         '<button class="btn-small" onclick="deleteBill(\'' + b.id + '\')">Удалить</button>' +
       '</div>';
     box.appendChild(el);
@@ -574,7 +591,6 @@ function renderHistory(){
   const box = document.getElementById('historyList');
   box.innerHTML = '';
 
-  // собираем все месяцы: из state.months + текущий + последние 12
   const keys = new Set(Object.keys(state.months));
   const now = new Date();
   for(let i=0;i<12;i++){
@@ -606,7 +622,12 @@ function renderHistory(){
     const el = document.createElement('div');
     el.className = 'item';
     el.style.cursor = 'pointer';
-    el.onclick = ()=>{ currentMonth = key; switchTab('month'); renderMonth(); };
+    el.onclick = ()=>{
+      if(editingBillId) cancelBillEdit();
+      currentMonth = key;
+      switchTab('month');
+      renderMonth();
+    };
     el.innerHTML =
       '<div class="item-head">' +
         '<div><div class="item-name">' + monthTitle(key) + '</div>' +
@@ -652,6 +673,7 @@ function importData(){
       state.bills = Array.isArray(parsed.bills) ? parsed.bills : [];
       state.months = parsed.months && typeof parsed.months === 'object' ? parsed.months : {};
       saveState();
+      cancelBillEdit();
       renderAll();
       alert('Импорт завершён. Счетов: ' + state.bills.length +
         ', месяцев: ' + Object.keys(state.months).length);
@@ -668,6 +690,7 @@ function clearAll(){
   if(!confirm('Точно? Это необратимо. Рекомендуем сначала сделать экспорт.')) return;
   state = {bills:[], months:{}};
   saveState();
+  cancelBillEdit();
   renderAll();
 }
 
@@ -686,21 +709,16 @@ function switchTab(name){
 }
 
 function shiftMonth(delta){
+  if(editingBillId) cancelBillEdit();
   const {year, month} = parseMonthKey(currentMonth);
   const d = new Date(year, month - 1 + delta, 1);
   currentMonth = monthKey(d.getFullYear(), d.getMonth()+1);
   renderMonth();
 }
 function goCurrentMonth(){
+  if(editingBillId) cancelBillEdit();
   currentMonth = currentMonthKey();
   renderMonth();
-}
-
-/* ============================================================
-   МОДАЛКА (заготовка на будущее)
-   ============================================================ */
-function closeModal(){
-  document.getElementById('modalBg').classList.remove('show');
 }
 
 /* ============================================================
