@@ -114,8 +114,9 @@ button:active{transform:scale(.98);opacity:.9}
     <div id="oneoffList"></div>
     <div class="inline-2" style="margin-top:8px">
       <input id="oneoffSum" type="number" step="0.01" min="0" placeholder="Сумма €" inputmode="decimal">
-      <input id="oneoffDesc" placeholder="Описание">
+      <input id="oneoffDesc" placeholder="Описание (Авторемонт)">
     </div>
+    <input id="oneoffNote" placeholder="Дополнение (замена масла, 270 000 км)" style="margin-top:8px">
     <button class="btn-main" onclick="addOneOff()">Добавить разовую трату</button>
   </div>
 
@@ -352,7 +353,7 @@ function renderMonth(){
     });
   }
 
-  // Разовые
+  // Разовые (с дополнением)
   const ooBox = document.getElementById('oneoffList');
   ooBox.innerHTML = '';
   if(!md.oneoffs.length){
@@ -363,7 +364,8 @@ function renderMonth(){
       el.className = 'item';
       el.innerHTML = '<div class="item-head">' +
         '<div><div class="item-name">' + escapeHtml(o.desc || 'Трата') + '</div>' +
-        '<div class="item-meta">' + escapeHtml(o.date || '') + '</div></div>' +
+        '<div class="item-meta">' + escapeHtml(o.date || '') +
+        (o.note ? ' • ' + escapeHtml(o.note) : '') + '</div></div>' +
         '<div class="item-sum">' + fmt(o.sum) + '</div></div>' +
         '<div class="item-actions">' +
         '<button class="btn-small" onclick="deleteOneOff(\'' + o.id + '\')">Удалить</button>' +
@@ -457,15 +459,26 @@ function setPayDate(billId, value){
 function addOneOff(){
   const sumEl = document.getElementById('oneoffSum');
   const descEl = document.getElementById('oneoffDesc');
+  const noteEl = document.getElementById('oneoffNote');
+  
   const sum = parseFloat(sumEl.value);
   if(!Number.isFinite(sum) || sum <= 0){
     alert('Введите сумму больше 0'); return;
   }
+  
   const md = getMonthData(currentMonth);
-  md.oneoffs.push({id:uid(), sum:sum, desc:descEl.value.trim() || 'Трата', date:todayISO()});
-  sumEl.value = ''; descEl.value = '';
+  md.oneoffs.push({
+    id:uid(), 
+    sum:sum, 
+    desc:descEl.value.trim() || 'Трата', 
+    note:noteEl.value.trim(),
+    date:todayISO()
+  });
+  
+  sumEl.value = ''; descEl.value = ''; noteEl.value = '';
   saveState(); renderMonth();
 }
+
 function deleteOneOff(id){
   const md = getMonthData(currentMonth);
   md.oneoffs = md.oneoffs.filter(o=>o.id !== id);
