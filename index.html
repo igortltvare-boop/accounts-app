@@ -77,17 +77,8 @@ button:active{transform:scale(.98);opacity:.9}
 .badge.paid{background:#1e4d32;color:#8ff0b5}
 .badge.due{background:#5a4a1f;color:#ffe08a}
 
-/* Цветная точка для категории */
-.dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-right: 8px;
-  flex-shrink: 0;
-}
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
 
-/* Стили для диаграммы */
 .chart-container{display:flex;flex-direction:column;align-items:center;margin-bottom:16px}
 .donut-chart{
   width:180px; height:180px; border-radius:50%;
@@ -116,7 +107,6 @@ button:active{transform:scale(.98);opacity:.9}
 
 <h1>💰 Учёт счетов</h1>
 
-<!-- ================= МЕСЯЦ ================= -->
 <div class="tab-page active" id="page-month">
   <div class="card">
     <div class="month-nav">
@@ -127,7 +117,6 @@ button:active{transform:scale(.98);opacity:.9}
     <button class="btn-small" style="width:100%" onclick="goCurrentMonth()">Текущий месяц</button>
   </div>
 
-  <!-- ДИАГРАММА -->
   <div class="card">
     <h2>Расходы за месяц</h2>
     <div class="chart-container">
@@ -179,7 +168,6 @@ button:active{transform:scale(.98);opacity:.9}
   </div>
 </div>
 
-<!-- ================= СЧЕТА ================= -->
 <div class="tab-page" id="page-bills">
   <div class="card">
     <h2>Управление категориями</h2>
@@ -227,7 +215,6 @@ button:active{transform:scale(.98);opacity:.9}
   </div>
 </div>
 
-<!-- ================= ИСТОРИЯ ================= -->
 <div class="tab-page" id="page-history">
   <div class="card">
     <h2>История по месяцам</h2>
@@ -235,7 +222,6 @@ button:active{transform:scale(.98);opacity:.9}
   </div>
 </div>
 
-<!-- ================= ДАННЫЕ ================= -->
 <div class="tab-page" id="page-data">
   <div class="card">
     <h2>Экспорт и импорт</h2>
@@ -285,6 +271,10 @@ function loadState(){
       ];
     }
   }catch(e){ console.error(e); }
+}
+
+function getOtherCategory() {
+  return state.categories.find(c => c.name.toLowerCase() === 'другое' || c.name.toLowerCase() === 'другие');
 }
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -356,11 +346,10 @@ function renderCategories(){
 
 function renderForms(){
   const catSelects = [document.getElementById('bCategory'), document.getElementById('oneoffCategory')];
-  const defaultOther = state.categories.find(c => c.name.toLowerCase() === 'другое')?.id || '';
+  const defaultOther = getOtherCategory()?.id || '';
 
   catSelects.forEach(sel => {
     if(!sel) return;
-    // Для разовых трат по умолчанию ставим "Другое", если там еще ничего не выбрано
     const val = sel.value || (sel.id === 'oneoffCategory' ? defaultOther : '');
     sel.innerHTML = '<option value="">Без категории</option>';
     state.categories.forEach(c => {
@@ -398,7 +387,9 @@ function renderMonth(){
   due.forEach(bill => {
     const pay = md.payments[bill.id] || {};
     const paid = !!pay.paid;
-    const cat = state.categories.find(c => c.id === bill.categoryId);
+    let cat = state.categories.find(c => c.id === bill.categoryId);
+    if (!cat && !bill.categoryId) cat = getOtherCategory();
+
     billsBox.innerHTML += `
       <div class="item">
         <div class="item-head">
@@ -424,7 +415,9 @@ function renderMonth(){
   const ooBox = document.getElementById('oneoffList');
   ooBox.innerHTML = md.oneoffs.length ? '' : '<div class="empty">Разовых трат нет</div>';
   md.oneoffs.forEach(o => {
-    const cat = state.categories.find(c => c.id === o.categoryId);
+    let cat = state.categories.find(c => c.id === o.categoryId);
+    if (!cat && !o.categoryId) cat = getOtherCategory();
+
     ooBox.innerHTML += `
       <div class="item">
         <div class="item-head">
@@ -484,8 +477,11 @@ function renderChart(){
   const totalExp = expenses.reduce((s,e)=>s+e.sum, 0);
   
   let grouped = {};
+  const otherCat = getOtherCategory();
+
   expenses.forEach(e => {
-    const cid = e.catId || 'none';
+    let cid = e.catId;
+    if (!cid) cid = otherCat ? otherCat.id : 'none'; // Если нет категории, принудительно кидаем в "Другое"
     grouped[cid] = (grouped[cid] || 0) + e.sum;
   });
 
@@ -576,12 +572,10 @@ function addOneOff(){
   const note = document.getElementById('oneoffNote').value.trim();
   let catId = document.getElementById('oneoffCategory').value;
   
-  // Если категория не выбрана, ищем "Другое"
   if(!catId) {
-    const otherCat = state.categories.find(c => c.name.toLowerCase() === 'другое' || c.name.toLowerCase() === 'другие');
+    const otherCat = getOtherCategory();
     if(otherCat) catId = otherCat.id;
   }
-  if(!catId) catId = null;
 
   if(!Number.isFinite(sum) || sum <= 0) return alert('Введите сумму');
   const md = getMonthData(currentMonth);
@@ -597,11 +591,7 @@ function addOneOff(){
 function updateOneOffDate(id, newDate){
   const md = getMonthData(currentMonth);
   const o = md.oneoffs.find(x => x.id === id);
-  if(o) {
-    o.date = newDate;
-    saveState();
-    // Мы не вызываем renderMonth(), чтобы инпут не терял фокус во время выбора даты
-  }
+  if(o) { o.date = newDate; saveState(); }
 }
 
 function deleteOneOff(id){
@@ -668,7 +658,9 @@ function renderBillsTemplates(){
   const box = document.getElementById('billsTemplates');
   box.innerHTML = state.bills.length ? '' : '<div class="empty">Счетов пока нет</div>';
   state.bills.forEach(b => {
-    const cat = state.categories.find(c => c.id === b.categoryId);
+    let cat = state.categories.find(c => c.id === b.categoryId);
+    if (!cat && !b.categoryId) cat = getOtherCategory();
+
     const periodText = b.period === 1 ? 'каждый месяц' : b.period === 2 ? 'раз в 2 мес' : b.period === 3 ? 'раз в 3 мес' : b.period === 6 ? 'раз в 6 мес' : 'раз в год';
     box.innerHTML += `
       <div class="item">
